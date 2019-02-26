@@ -1,3 +1,4 @@
+const _ = require('lodash')
 const updateNotifier = require('update-notifier')
 const yargs = require('yargs')
 const run = require('./run')
@@ -6,7 +7,9 @@ const pkg = require('../../package.json')
 module.exports = function() {
   updateNotifier({ pkg }).notify()
 
+  const pkgName = _.camelCase(pkg.name)
   const argv = yargs
+    .pkgConf(pkgName)
     .config('config')
     .usage('$0 [options] <source>')
     .options({
