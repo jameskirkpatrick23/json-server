@@ -3,34 +3,11 @@ const path = require('path')
 const jph = require('json-parse-helpfulerror')
 const _ = require('lodash')
 const chalk = require('chalk')
-const enableDestroy = require('server-destroy')
 const pause = require('connect-pause')
+const ui = require('./utils/ui')
 const is = require('./utils/is')
 const load = require('./utils/load')
 const jsonServer = require('../server')
-
-function prettyPrint(argv, object, rules) {
-  const root = `http://${argv.host}:${argv.port}`
-
-  console.log()
-  console.log(chalk.bold('  Resources'))
-  for (let prop in object) {
-    console.log(`  ${root}/${prop}`)
-  }
-
-  if (rules) {
-    console.log()
-    console.log(chalk.bold('  Other routes'))
-    for (var rule in rules) {
-      console.log(`  ${rule} -> ${rules[rule]}`)
-    }
-  }
-
-  console.log()
-  console.log(chalk.bold('  Home'))
-  console.log(`  ${root}`)
-  console.log()
-}
 
 function createApp(db, routes, middlewares, argv) {
   const app = jsonServer.create()
@@ -95,9 +72,8 @@ module.exports = function(argv) {
   console.log()
   console.log(chalk.cyan('  \\{^_^}/ hi!'))
 
-  function start(cb) {
-    console.log()
-
+  function start(isRestart = false) {
+    if (isRestart) ui.clearScreen()
     console.log(chalk.gray('  Loading', source))
 
     server = undefined
@@ -127,11 +103,8 @@ module.exports = function(argv) {
       app = createApp(db, routes, middlewares, argv)
       server = app.listen(argv.port, argv.host)
 
-      // Enhance with a destroy function
-      enableDestroy(server)
-
       // Display server informations
-      prettyPrint(argv, db.getState(), routes)
+      ui.prettyPrint(argv, db.getState(), routes)
 
       // Catch and handle any error occurring in the server process
       process.on('uncaughtException', error => {
@@ -180,8 +153,7 @@ module.exports = function(argv) {
 
       // Watch files
       if (argv.watch) {
-        console.log(chalk.gray('  Watching...'))
-        console.log()
+        console.log(chalk.gray('\n  Watching...'), '\n')
         const source = argv._[0]
 
         // Can't watch URL
@@ -190,7 +162,6 @@ module.exports = function(argv) {
         // Watch .js or .json file
         // Since lowdb uses atomic writing, directory is watched instead of file
         const watchedDir = path.dirname(source)
-        let readError = false
         fs.watch(watchedDir, (event, file) => {
           // https://github.com/typicode/json-server/issues/420
           // file can be null
@@ -201,25 +172,18 @@ module.exports = function(argv) {
                 let obj
                 try {
                   obj = jph.parse(fs.readFileSync(watchedFile))
-                  if (readError) {
-                    console.log(chalk.green(`  Read error has been fixed :)`))
-                    readError = false
-                  }
                 } catch (e) {
-                  readError = true
+                  ui.clearScreen()
                   console.log(chalk.red(`  Error reading ${watchedFile}`))
                   console.error(e.message)
                   return
                 }
 
                 // Compare .json file content with in memory database
-                const isDatabaseDifferent = !_.isEqual(obj, app.db.getState())
-                if (isDatabaseDifferent) {
-                  console.log(
-                    chalk.gray(`  ${source} has changed, reloading...`)
-                  )
-                  server && server.destroy(() => start())
-                }
+                if (_.isEqual(obj, app.db.getState())) return
+
+                console.log(chalk.gray(`  ${source} has changed, reloading...`))
+                server && server.close(() => start(true))
               }
             }
           }
@@ -227,17 +191,25 @@ module.exports = function(argv) {
 
         // Watch routes
         if (argv.routes) {
-          const watchedDir = path.dirname(argv.routes)
-          fs.watch(watchedDir, (event, file) => {
-            if (file) {
-              const watchedFile = path.resolve(watchedDir, file)
-              if (watchedFile === path.resolve(argv.routes)) {
-                console.log(
-                  chalk.gray(`  ${argv.routes} has changed, reloading...`)
-                )
-                server && server.destroy(() => start())
-              }
+          const watchedFile = path.resolve(argv.routes)
+          fs.watchFile(watchedFile, { interval: 1000 }, (curr, prev) => {
+            if (+curr.mtime === +prev.mtime) {
+              return
             }
+
+            try {
+              jph.parse(fs.readFileSync(watchedFile))
+            } catch (e) {
+              ui.clearScreen()
+              console.log(chalk.red(`  Error reading ${watchedFile}`))
+              console.error(e.message)
+              return
+            }
+
+            console.log(
+              chalk.gray(`  ${argv.routes} has changed, reloading...`)
+            )
+            server && server.close(() => start(true))
           })
         }
       }
