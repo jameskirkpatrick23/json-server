@@ -125,10 +125,12 @@ module.exports = function(argv) {
   // Start server
   start()
     .then(() => {
-      // Snapshot
+      console.log(
+        chalk.gray('  Type [r + enter] at any time to restart the server')
+      )
       console.log(
         chalk.gray(
-          '  Type s + enter at any time to create a snapshot of the database'
+          '  Type [s + enter] at any time to create a snapshot of the database'
         )
       )
 
@@ -140,14 +142,22 @@ module.exports = function(argv) {
       })
       process.stdin.setEncoding('utf8')
       process.stdin.on('data', chunk => {
-        if (chunk.trim().toLowerCase() === 's') {
-          const filename = `db-${Date.now()}.json`
-          const file = path.join(argv.snapshots, filename)
-          const state = app.db.getState()
-          fs.writeFileSync(file, JSON.stringify(state, null, 2), 'utf-8')
-          console.log(
-            `  Saved snapshot to ${path.relative(process.cwd(), file)}\n`
-          )
+        const char = chunk.trim().toLowerCase()
+        switch (char) {
+          case 's':
+            const filename = `db-${Date.now()}.json`
+            const file = path.join(argv.snapshots, filename)
+            const state = app.db.getState()
+            fs.writeFileSync(file, JSON.stringify(state, null, 2), 'utf-8')
+            console.log(
+              `  Saved snapshot to ${path.relative(process.cwd(), file)}\n`
+            )
+            break
+          case 'r':
+            server.close(() => start(true))
+            break
+          default:
+            break
         }
       })
 
