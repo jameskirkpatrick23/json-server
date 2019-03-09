@@ -8,9 +8,10 @@
     "test": "test"
   },
   "scripts": {
-    "pretest": "npm run build",
+    "pretest": "npm run lint",
+    "prebuild": "npm run test",
     "test": "cross-env NODE_ENV=test jest",
-    "posttest": "npm run lint",
+    "test:cover": "npm run test -- --coverage",
     "start": "run-p start:**",
     "start:babel-node": "babel-node src/cli/bin db.json -r routes.json",
     "start:webpack": "webpack -d --watch",

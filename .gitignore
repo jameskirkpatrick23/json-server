@@ -1,5 +1,6 @@
 **/*.log
 node_modules
+coverage
 tmp
 lib
 dist
