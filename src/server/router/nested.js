@@ -10,7 +10,7 @@ module.exports = opts => {
   // Rewrite URL (/:resource/:id/:nested -> /:nested) and request query
   function get(req, res, next) {
     const prop = pluralize.singular(req.params.resource)
-    req.query[`${prop}${opts.foreignKeySuffix}`] = req.params.id
+    req.query[`${prop}${opts.foreignKeySuffix}`] = parseInt(req.params.id)
     req.url = `/${req.params.nested}`
     next()
   }
